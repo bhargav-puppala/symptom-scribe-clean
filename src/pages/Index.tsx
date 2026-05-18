@@ -1,15 +1,26 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { motion, AnimatePresence } from "framer-motion";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import Hero from "@/components/Hero";
-import { ArrowRight, Brain, Clock, TrendingUp, Users, Star, CheckCircle2, Heart, Activity, Shield } from "lucide-react";
+import { ArrowRight, Brain, Clock, TrendingUp, Users, Star, CheckCircle2, Heart, Activity, Shield, Menu, X } from "lucide-react";
 
 const Index = () => {
   const navigate = useNavigate();
   const [activeTestimonial, setActiveTestimonial] = useState(0);
+  const [isScrolled, setIsScrolled] = useState(false);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+
+  useEffect(() => {
+    const handleScroll = () => {
+      setIsScrolled(window.scrollY > 20);
+    };
+    window.addEventListener("scroll", handleScroll);
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, []);
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -42,83 +53,115 @@ const Index = () => {
   return (
     <div className="min-h-screen bg-background flex flex-col">
 
-      <header className="border-b border-border px-6 py-4">
+      <header 
+        className={`px-6 py-4 sticky top-0 z-50 transition-all duration-300 ${
+          isScrolled 
+            ? "bg-background/95 backdrop-blur-md border-b border-border/50 shadow-sm" 
+            : "bg-background/0 border-transparent"
+        }`}
+      >
         <div className="container mx-auto flex items-center justify-between">
-          <h1 className="text-2xl font-bold text-primary">
+          <h1 
+            className="text-2xl font-bold text-primary cursor-pointer transition-opacity hover:opacity-80"
+            onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+          >
             Symptom Scribe🩺
           </h1>
 
-          <div className="flex items-center gap-4">
+          <div className="hidden md:flex items-center gap-4">
             <Button variant="ghost" onClick={() => navigate("/auth")}>
               Sign In
             </Button>
-
             <Button onClick={() => navigate("/auth")}>
               Get Started
             </Button>
           </div>
-        </div>
-      </header>
 
-  <Hero />
+          <div className="md:hidden">
+            <Button variant="ghost" size="icon" onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}>
+              {isMobileMenuOpen ? <X className="w-6 h-6 text-primary" /> : <Menu className="w-6 h-6 text-primary" />}
+            </Button>
+          </div>
+        </div>
+
+        <AnimatePresence>
+          {isMobileMenuOpen && (
+            <motion.div 
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: "auto" }}
+              exit={{ opacity: 0, height: 0 }}
+              className="absolute top-full left-0 w-full bg-background border-b border-border shadow-lg overflow-hidden md:hidden"
+            >
+              <div className="p-4 flex flex-col gap-3">
+                <Button variant="outline" className="w-full justify-center" onClick={() => navigate("/auth")}>
+                  Sign In
+                </Button>
+                <Button className="w-full justify-center" onClick={() => navigate("/auth")}>
+                  Get Started
+                </Button>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </header>
+      <Hero />
       
       {/* Features Section */}
-      <section className="container mx-auto py-20 px-4">
+      <section className="container mx-auto py-14 md:py-16 px-4">
         <div className="max-w-6xl mx-auto">
-          <div className="text-center mb-12 animate-fade-in">
-            <h2 className="text-3xl md:text-4xl font-bold mb-4">Comprehensive Health Tracking</h2>
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true, margin: "-50px" }}
+            transition={{ duration: 0.5 }}
+            className="text-center mb-10"
+          >
+            <h2 className="text-3xl md:text-4xl font-bold mb-3">Comprehensive Health Tracking</h2>
             <p className="text-muted-foreground text-lg max-w-2xl mx-auto">
               Everything you need to monitor, analyze, and improve your health in one powerful platform
             </p>
-          </div>
+          </motion.div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            <Card className="hover-scale border-2 hover:border-primary transition-all">
-              <CardHeader>
-                <Brain className="w-10 h-10 text-primary mb-2" />
-                <CardTitle>AI Health Assistant</CardTitle>
-                <CardDescription>
-                  Get instant symptom analysis with severity assessment and personalized recommendations
-                </CardDescription>
-              </CardHeader>
-            </Card>
-
-            <Card className="hover-scale border-2 hover:border-primary transition-all">
-              <CardHeader>
-                <TrendingUp className="w-10 h-10 text-primary mb-2" />
-                <CardTitle>Health Analytics</CardTitle>
-                <CardDescription>
-                  Track your health metrics with visual analytics and trend analysis over time
-                </CardDescription>
-              </CardHeader>
-            </Card>
-
-            <Card className="hover-scale border-2 hover:border-primary transition-all">
-              <CardHeader>
-                <Clock className="w-10 h-10 text-primary mb-2" />
-                <CardTitle>Complete History</CardTitle>
-                <CardDescription>
-                  Maintain detailed records of all consultations and health events in one place
-                </CardDescription>
-              </CardHeader>
-            </Card>
-
-            <Card className="hover-scale border-2 hover:border-primary transition-all">
-              <CardHeader>
-                <Shield className="w-10 h-10 text-primary mb-2" />
-                <CardTitle>Emergency Resources</CardTitle>
-                <CardDescription>
-                  Quick access to emergency contacts and critical health information when needed
-                </CardDescription>
-              </CardHeader>
-            </Card>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+            {[
+              { icon: Brain, title: "AI Health Assistant", desc: "Get instant symptom analysis with severity assessment and personalized recommendations" },
+              { icon: TrendingUp, title: "Health Analytics", desc: "Track your health metrics with visual analytics and trend analysis over time" },
+              { icon: Clock, title: "Complete History", desc: "Maintain detailed records of all consultations and health events in one place" },
+              { icon: Shield, title: "Emergency Resources", desc: "Quick access to emergency contacts and critical health information when needed" },
+            ].map((feature, index) => (
+              <motion.div
+                key={feature.title}
+                initial={{ opacity: 0, y: 25 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true, margin: "-30px" }}
+                transition={{ duration: 0.45, delay: index * 0.1 }}
+              >
+                <Card className="feature-card h-full">
+                  <CardHeader>
+                    <div className="w-12 h-12 bg-primary/10 rounded-lg flex items-center justify-center mb-3">
+                      <feature.icon className="w-6 h-6 text-primary" />
+                    </div>
+                    <CardTitle className="text-lg">{feature.title}</CardTitle>
+                    <CardDescription className="text-sm leading-relaxed">
+                      {feature.desc}
+                    </CardDescription>
+                  </CardHeader>
+                </Card>
+              </motion.div>
+            ))}
           </div>
         </div>
       </section>
 
       {/* How It Works Section */}
       <section className="bg-muted py-20 px-4">
-        <div className="max-w-6xl mx-auto">
+        <motion.div 
+          initial={{ opacity: 0, y: 20 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true, margin: "-50px" }}
+          transition={{ duration: 0.5 }}
+          className="max-w-6xl mx-auto"
+        >
           <div className="text-center mb-12">
             <h2 className="text-3xl md:text-4xl font-bold mb-4">How It Works</h2>
             <p className="text-muted-foreground text-lg">Three simple steps to better health management</p>
@@ -155,12 +198,18 @@ const Index = () => {
               </p>
             </div>
           </div>
-        </div>
+        </motion.div>
       </section>
 
       {/* Benefits Section */}
       <section className="container mx-auto py-20 px-4">
-        <div className="max-w-6xl mx-auto">
+        <motion.div 
+          initial={{ opacity: 0, y: 20 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true, margin: "-50px" }}
+          transition={{ duration: 0.5 }}
+          className="max-w-6xl mx-auto"
+        >
           <div className="text-center mb-12">
             <h2 className="text-3xl md:text-4xl font-bold mb-4">Why Choose Smart Health Tracker</h2>
             <p className="text-muted-foreground text-lg">Powerful features that make health management effortless</p>
@@ -227,12 +276,18 @@ const Index = () => {
               </div>
             </div>
           </div>
-        </div>
+        </motion.div>
       </section>
 
       {/* Testimonials Section */}
       <section className="bg-gradient-to-br from-primary via-primary-glow to-secondary py-20 px-4">
-        <div className="max-w-4xl mx-auto">
+        <motion.div 
+          initial={{ opacity: 0, y: 20 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true, margin: "-50px" }}
+          transition={{ duration: 0.5 }}
+          className="max-w-4xl mx-auto"
+        >
           <div className="text-center mb-12">
             <h2 className="text-3xl md:text-4xl font-bold text-white mb-4">What Our Users Say</h2>
             <p className="text-white/90 text-lg">Join thousands of satisfied users taking control of their health</p>
@@ -265,12 +320,18 @@ const Index = () => {
               </div>
             </CardContent>
           </Card>
-        </div>
+        </motion.div>
       </section>
 
       {/* FAQ Section */}
       <section className="container mx-auto py-20 px-4">
-        <div className="max-w-3xl mx-auto">
+        <motion.div 
+          initial={{ opacity: 0, y: 20 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true, margin: "-50px" }}
+          transition={{ duration: 0.5 }}
+          className="max-w-3xl mx-auto"
+        >
           <div className="text-center mb-12">
             <h2 className="text-3xl md:text-4xl font-bold mb-4">Frequently Asked Questions</h2>
             <p className="text-muted-foreground text-lg">Everything you need to know about Smart Health Tracker</p>
@@ -319,12 +380,18 @@ const Index = () => {
               </AccordionContent>
             </AccordionItem>
           </Accordion>
-        </div>
+        </motion.div>
       </section>
 
       {/* Final CTA Section */}
       <section className="bg-muted py-20 px-4">
-        <div className="max-w-4xl mx-auto text-center">
+        <motion.div 
+          initial={{ opacity: 0, scale: 0.95 }}
+          whileInView={{ opacity: 1, scale: 1 }}
+          viewport={{ once: true, margin: "-50px" }}
+          transition={{ duration: 0.5 }}
+          className="max-w-4xl mx-auto text-center"
+        >
           <Heart className="w-16 h-16 text-primary mx-auto mb-6" />
           <h2 className="text-3xl md:text-4xl font-bold mb-4">Ready to Take Control of Your Health?</h2>
           <p className="text-muted-foreground text-lg mb-8 max-w-2xl mx-auto">
@@ -332,18 +399,18 @@ const Index = () => {
             understand their symptoms, and make informed decisions about their wellbeing.
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <Button size="lg" onClick={() => navigate("/auth")} className="gap-2">
+            <Button size="lg" onClick={() => navigate("/auth")} className="gap-2 group transition-all duration-300 hover:shadow-lg hover:-translate-y-0.5">
               Get Started Free
-              <ArrowRight className="w-4 h-4" />
+              <ArrowRight className="w-4 h-4 group-hover:translate-x-1.5 transition-transform duration-300" />
             </Button>
-            <Button size="lg" variant="outline" onClick={() => navigate("/auth")}>
+            <Button size="lg" variant="outline" onClick={() => navigate("/auth")} className="transition-all duration-300 active:scale-95 hover:bg-muted">
               Sign In
             </Button>
           </div>
           <p className="text-sm text-muted-foreground mt-6">
             No credit card required • Free to use • Secure & Private
           </p>
-        </div>
+        </motion.div>
       </section>
       
       <footer className="border-t border-border py-8 px-4">

@@ -109,4 +109,49 @@ All colors MUST be HSL.
   .hover-scale {
     @apply transition-transform duration-200 hover:scale-105;
   }
+
+  .glass-card {
+    @apply backdrop-blur-md bg-white/10 border border-white/20 rounded-xl shadow-lg;
+  }
+
+  .shimmer-badge {
+    background: linear-gradient(
+      90deg,
+      transparent 0%,
+      rgba(255, 255, 255, 0.15) 50%,
+      transparent 100%
+    );
+    background-size: 200% 100%;
+    animation: shimmer 2.5s ease-in-out infinite;
+  }
+
+  .hero-wave {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    overflow: hidden;
+    line-height: 0;
+  }
+
+  .hero-wave svg {
+    position: relative;
+    display: block;
+    width: calc(100% + 1.3px);
+    height: 60px;
+  }
+
+  .feature-card {
+    @apply bg-card/80 backdrop-blur-sm border border-border/50 rounded-xl shadow-soft transition-all duration-300;
+  }
+
+  .feature-card:hover {
+    @apply shadow-glow border-primary/30 -translate-y-1;
+  }
+
+  .bg-grid-pattern {
+    background-image: linear-gradient(to right, hsl(var(--foreground)) 1px, transparent 1px),
+      linear-gradient(to bottom, hsl(var(--foreground)) 1px, transparent 1px);
+    background-size: 32px 32px;
+  }
 }
