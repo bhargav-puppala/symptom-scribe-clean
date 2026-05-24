@@ -272,6 +272,7 @@ const BrainGames = () => {
     setTimeout(() => {
       setCurrentQuestion(generateTrendQuestion());
       setShowPatternFeedback(false);
+      setLifelineUsed(false);
     }, 2000);
   };
 
