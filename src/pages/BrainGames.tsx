@@ -33,6 +33,8 @@ const BrainGames = () => {
   const [userSequence, setUserSequence] = useState<{ word: string; index: number }[]>([]);
   const [wordPhase, setWordPhase] = useState<"memorize" | "recall">("memorize");
   const [timeLeft, setTimeLeft] = useState(10);
+  const [dragIndex, setDragIndex] = useState<number | null>(null);
+  const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
 
   // Pattern Recognition Game States
   const [patternScore, setPatternScore] = useState(0);
@@ -442,7 +444,6 @@ const BrainGames = () => {
       setCurrentQuestion(nextQuestion);
       setFilteredOptions([]);
       setShowPatternFeedback(false);
-      setLifelineUsed(false);
     }, 2000);
   };
 
@@ -893,27 +894,98 @@ const BrainGames = () => {
               <div className="p-6 bg-muted rounded-xl">
                 <h3 className="text-lg font-semibold mb-4">Available words:</h3>
                 <div className="flex flex-wrap gap-2">
-                  {healthWords.map((word, idx) => (
-                    <Button key={idx} variant="outline" onClick={() => {
-                      if (wordPhase !== "recall") { showWarning("Wait!", "Memorize phase is still active"); return; }
-                      setUserSequence([...userSequence, { word, index: userSequence.length }]);
-                      showInfo("Word Added", `Added "${word}" to your sequence`);
-                    }}>
-                      {word}
-                    </Button>
-                  ))}
+                  {healthWords.map((word, idx) => {
+                    const alreadySelected = userSequence.some((w) => w.word === word);
+                    return (
+                      <Button
+                        key={idx}
+                        variant="outline"
+                        disabled={alreadySelected}
+                        className={alreadySelected ? "opacity-30 cursor-not-allowed line-through" : ""}
+                        onClick={() => {
+                          if (wordPhase !== "recall") { showWarning("Wait!", "Memorize phase is still active"); return; }
+                          setUserSequence([...userSequence, { word, index: userSequence.length }]);
+                        }}
+                      >
+                        {word}
+                      </Button>
+                    );
+                  })}
                 </div>
               </div>
-              {userSequence.length > 0 && (
-                <div className="p-6 bg-accent rounded-xl">
-                  <h3 className="text-lg font-semibold mb-4">Your sequence:</h3>
+              {/* Your sequence — drag to reorder, ❌ to remove and restore word */}
+              <div className="p-6 bg-accent rounded-xl min-h-[80px]">
+                <h3 className="text-lg font-semibold mb-1">
+                  Your sequence:
+                  <span className="ml-2 text-sm font-normal text-muted-foreground">
+                    ({userSequence.length} / {wordSequence.length} words)
+                  </span>
+                </h3>
+                <p className="text-xs text-muted-foreground mb-4">Drag to reorder • ✕ to remove</p>
+                {userSequence.length === 0 ? (
+                  <p className="text-muted-foreground text-sm">Click words above to build your sequence</p>
+                ) : (
                   <div className="flex flex-wrap gap-3">
-                    {userSequence.map((word, idx) => (
-                      <div key={idx} className="px-6 py-3 bg-secondary text-secondary-foreground rounded-lg font-semibold">{word.word}</div>
+                    {userSequence.map((item, idx) => (
+                      <div
+                        key={`${item.word}-${idx}`}
+                        draggable
+                        onDragStart={() => {
+                          setDragIndex(idx);
+                        }}
+                        onDragOver={(e) => {
+                          e.preventDefault(); // required to allow drop
+                          setDragOverIndex(idx);
+                        }}
+                        onDrop={(e) => {
+                          e.preventDefault();
+                          if (dragIndex === null || dragIndex === idx) {
+                            setDragIndex(null);
+                            setDragOverIndex(null);
+                            return;
+                          }
+                          // Reorder: remove from dragIndex, insert at idx
+                          const updated = [...userSequence];
+                          const [moved] = updated.splice(dragIndex, 1);
+                          updated.splice(idx, 0, moved);
+                          setUserSequence(updated.map((w, i) => ({ ...w, index: i })));
+                          setDragIndex(null);
+                          setDragOverIndex(null);
+                        }}
+                        onDragEnd={() => {
+                          setDragIndex(null);
+                          setDragOverIndex(null);
+                        }}
+                        className={`flex items-center gap-1 pl-3 pr-2 py-2 rounded-lg font-semibold cursor-grab active:cursor-grabbing select-none transition-all duration-150
+                          ${dragIndex === idx ? "opacity-40 scale-95 ring-2 ring-primary" : ""}
+                          ${dragOverIndex === idx && dragIndex !== idx ? "ring-2 ring-primary scale-105 bg-primary text-primary-foreground" : "bg-secondary text-secondary-foreground"}
+                        `}
+                      >
+                        {/* Drag handle */}
+                        <span className="text-muted-foreground mr-1 text-xs select-none">⠿</span>
+                        {/* Position number */}
+                        <span className="text-xs opacity-60 mr-1">{idx + 1}.</span>
+                        {/* Word */}
+                        <span>{item.word}</span>
+                        {/* ❌ cross — removes word, restores it to Available */}
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            const updated = userSequence
+                              .filter((_, i) => i !== idx)
+                              .map((w, i) => ({ ...w, index: i }));
+                            setUserSequence(updated);
+                          }}
+                          className="ml-2 w-5 h-5 rounded-full bg-destructive/20 hover:bg-destructive hover:text-white text-destructive flex items-center justify-center transition-colors duration-150 text-xs font-bold leading-none"
+                          title={`Remove "${item.word}"`}
+                        >
+                          ×
+                        </button>
+                      </div>
                     ))}
                   </div>
-                </div>
-              )}
+                )}
+              </div>
               <div className="flex gap-4">
                 <Button
                   onClick={() => {
