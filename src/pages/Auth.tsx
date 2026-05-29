@@ -434,6 +434,8 @@ const Auth = () => {
                     policy={DEFAULT_PASSWORD_POLICY}
                     showGenerator={true}
                     id="signup-password"
+                    showPasswordState={showPassword}
+                    onShowPasswordChange={setShowPassword}
                   />
 
                   <Button
