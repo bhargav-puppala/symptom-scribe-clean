@@ -430,9 +430,14 @@ const BrainGames = () => {
   };
 
   const startWordGame = () => {
+    if (wordTimeoutRef.current) {
+      clearTimeout(wordTimeoutRef.current);
+      wordTimeoutRef.current = null;
+    }
+
     const sequence = shuffleArray([...healthWords]).slice(
       0,
-    Math.min(5, healthWords.length)
+      Math.min(5, healthWords.length)
     );
 
     setWordSequence(sequence);
@@ -443,7 +448,7 @@ const BrainGames = () => {
 
     showInfo("Memorize these words!", "You have 10 seconds...");
 
-    setTimeout(() => {
+    wordTimeoutRef.current = window.setTimeout(() => {
       setWordPhase("recall");
       showWarning("Time's up!", "Now recall the words in order");
     }, 10000);
