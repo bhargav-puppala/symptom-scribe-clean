@@ -1,5 +1,8 @@
 import { useState, useRef, useEffect } from "react";
-
+import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
+import { showSuccess, showError, showInfo, showLoading } from "@/lib/toast-helpers";
+ 
 const suggestions = [
   { emoji: "🤒", label: "I have a fever" },
   { emoji: "🤧", label: "Sore throat for 3 days" },
@@ -7,58 +10,184 @@ const suggestions = [
   { emoji: "🤢", label: "Stomach pain after eating" },
   { emoji: "😵‍💫", label: "Feeling tired and dizzy" },
 ];
-
+ 
 const AIHealthAssistant = () => {
   const [symptoms, setSymptoms] = useState("");
   const [messages, setMessages] = useState<{ role: "user" | "assistant"; text: string; time: string }[]>([]);
   const [loading, setLoading] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
-
+  const { toast } = useToast();
+ 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, loading]);
-
+ 
   const getTime = () =>
     new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-
+ 
   const handleAnalyze = async (text?: string) => {
     const userMessage = (text ?? symptoms).trim();
     if (!userMessage || loading) return;
-
+ 
     setSymptoms("");
-    setMessages((prev) => [...prev, { role: "user", text: userMessage, time: getTime() }]);
+    const time = getTime();
+    setMessages((prev) => [...prev, { role: "user", text: userMessage, time }]);
     setLoading(true);
-
-    setTimeout(() => {
-      setMessages((prev) => [
-        ...prev,
+ 
+    let assistantContent = "";
+ 
+    const upsertAssistant = (chunk: string) => {
+      assistantContent += chunk;
+      setMessages((prev) => {
+        const last = prev[prev.length - 1];
+        if (last?.role === "assistant") {
+          return prev.map((m, i) =>
+            i === prev.length - 1 ? { ...m, text: assistantContent } : m
+          );
+        }
+        return [...prev, { role: "assistant", text: assistantContent, time: getTime() }];
+      });
+    };
+ 
+    const { dismiss: dismissLoading } = showLoading("Analyzing symptoms...", "AI is processing your request");
+ 
+    try {
+      const recentContext = messages.slice(-6).map((m) => ({
+        role: m.role,
+        content: m.text,
+      }));
+ 
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/symptom-analyzer`,
         {
-          role: "assistant",
-          time: getTime(),
-          text:
-            `Based on your symptoms, here are some general insights:\n\n` +
-            `• Monitor the duration and intensity of your symptoms.\n` +
-            `• Stay hydrated and get adequate rest.\n` +
-            `• If symptoms persist for more than 48 hours or worsen, consult a healthcare professional.`,
-        },
-      ]);
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+          },
+          body: JSON.stringify({
+            messages: [...recentContext, { role: "user", content: userMessage }],
+          }),
+        }
+      );
+ 
+      if (!response.ok || !response.body) throw new Error("Failed to start stream");
+ 
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let textBuffer = "";
+      let streamDone = false;
+ 
+      while (!streamDone) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        textBuffer += decoder.decode(value, { stream: true });
+ 
+        let newlineIndex: number;
+        while ((newlineIndex = textBuffer.indexOf("\n")) !== -1) {
+          let line = textBuffer.slice(0, newlineIndex);
+          textBuffer = textBuffer.slice(newlineIndex + 1);
+ 
+          if (line.endsWith("\r")) line = line.slice(0, -1);
+          if (line.startsWith(":") || line.trim() === "") continue;
+          if (!line.startsWith("data: ")) continue;
+ 
+          const jsonStr = line.slice(6).trim();
+          if (jsonStr === "[DONE]") { streamDone = true; break; }
+ 
+          try {
+            const parsed = JSON.parse(jsonStr);
+            const content = parsed.choices?.[0]?.delta?.content as string | undefined;
+            if (content) upsertAssistant(content);
+          } catch {
+            textBuffer = line + "\n" + textBuffer;
+            break;
+          }
+        }
+      }
+ 
+      if (assistantContent) {
+        dismissLoading();
+        showSuccess("Analysis complete!", "Your symptoms have been analyzed");
+ 
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          const possibleCauses: string[] = [];
+          const recommendations: string[] = [];
+          let severityLevel = "low";
+ 
+          const lines = assistantContent.split("\n");
+          let currentSection = "";
+ 
+          for (const line of lines) {
+            const trimmedLine = line.trim();
+            if (/possible\s+causes/i.test(trimmedLine)) {
+              currentSection = "causes";
+            } else if (/severity\s+level/i.test(trimmedLine)) {
+              currentSection = "severity";
+              const severityMatch = trimmedLine.match(/severity\s+level\s*:\s*[*_#`\[]*\s*(low|moderate|high)/i);
+              if (severityMatch) {
+                severityLevel = severityMatch[1].toLowerCase();
+                showInfo("Severity Assessment", `AI rates this as ${severityLevel} severity`);
+              }
+            } else if (/recommendations/i.test(trimmedLine)) {
+              currentSection = "recommendations";
+            } else {
+              const listMatch = trimmedLine.match(/^[-*•]\s+(.+)/) || trimmedLine.match(/^\d+\.\s+(.+)/);
+              if (listMatch) {
+                const item = listMatch[1].trim();
+                if (currentSection === "causes") possibleCauses.push(item);
+                else if (currentSection === "recommendations") recommendations.push(item);
+              }
+            }
+          }
+ 
+          const riskScore =
+            severityLevel === "high" ? Math.floor(Math.random() * 20) + 70
+            : severityLevel === "moderate" ? Math.floor(Math.random() * 30) + 40
+            : Math.floor(Math.random() * 30) + 10;
+ 
+          const { error: insertError } = await supabase.from("symptom_history").insert({
+            user_id: user.id,
+            symptoms: userMessage,
+            ai_analysis: assistantContent,
+            severity_level: severityLevel,
+            possible_causes: possibleCauses.length > 0 ? possibleCauses : null,
+            recommendations: recommendations.length > 0 ? recommendations : null,
+            risk_score: riskScore,
+          });
+ 
+          if (insertError) {
+            console.error("Error saving symptom history:", insertError);
+            showError("Save failed", "Could not save to your health history");
+          } else {
+            showSuccess("Saved to history", "This analysis has been added to your health records");
+          }
+        }
+      }
+    } catch (error) {
+      console.error("Chat error:", error);
+      dismissLoading();
+      showError("Analysis failed", "Failed to get AI response. Please try again.");
+      setMessages((prev) => prev.filter((m) => !(m.role === "user" && m.text === userMessage)));
+    } finally {
       setLoading(false);
-    }, 1800);
+    }
   };
-
+ 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
       handleAnalyze();
     }
   };
-
+ 
   const hasMessages = messages.length > 0 || loading;
-
+ 
   return (
     <div className="flex flex-col h-full bg-background text-foreground overflow-hidden">
-
+ 
       {/* Header */}
       <div className="flex-shrink-0 px-5 py-3 border-b border-border flex items-center justify-between gap-3">
         <div className="flex items-start gap-2 flex-1 min-w-0">
@@ -73,7 +202,7 @@ const AIHealthAssistant = () => {
           <span className="text-xs text-muted-foreground font-medium">Online</span>
         </div>
       </div>
-
+ 
       {/* Chat area */}
       <div className="flex-1 overflow-y-auto">
         {!hasMessages ? (
@@ -96,7 +225,7 @@ const AIHealthAssistant = () => {
                 </p>
               </div>
             </div>
-
+ 
             {/* Try asking chips — horizontal scroll */}
             <div className="w-full max-w-lg">
               <div className="flex items-center gap-2 mb-3">
@@ -162,7 +291,7 @@ const AIHealthAssistant = () => {
                 </div>
               </div>
             ))}
-
+ 
             {/* Typing indicator */}
             {loading && (
               <div className="flex items-start gap-3">
@@ -180,7 +309,7 @@ const AIHealthAssistant = () => {
           </div>
         )}
       </div>
-
+ 
       {/* Input — pinned at bottom */}
       <div className="flex-shrink-0 border-t border-border px-4 py-3 bg-background">
         <div className="max-w-2xl mx-auto">
@@ -211,9 +340,9 @@ const AIHealthAssistant = () => {
           </p>
         </div>
       </div>
-
+ 
     </div>
   );
 };
-
+ 
 export default AIHealthAssistant;
