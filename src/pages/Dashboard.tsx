@@ -3,7 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Activity, TrendingUp, AlertCircle, CheckCircle } from "lucide-react";
-import { showError, showSuccess, showInfo } from "@/lib/toast-helpers";
+import { showError, showInfo } from "@/lib/toast-helpers";
 import CountUp from "react-countup";
 
 interface Stats {
@@ -64,9 +64,6 @@ const Dashboard = () => {
         });
 
         setRecentHistory(symptoms.slice(0, 5));
-
-        // Show success toast when data loads
-        showSuccess("Dashboard Updated", `Loaded ${symptoms.length} health records`);
       } else {
         setStats({
           totalSymptoms: 0,
@@ -76,7 +73,6 @@ const Dashboard = () => {
         });
         setRecentHistory([]);
 
-        // Show info toast when no data
         showInfo("Welcome!", "Start by consulting with the AI Assistant");
       }
     } catch (error) {
