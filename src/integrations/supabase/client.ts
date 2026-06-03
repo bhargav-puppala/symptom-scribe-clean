@@ -13,7 +13,7 @@ if (!supabaseUrl || !supabasePublishableKey) {
   );
 }
 
-export const supabase = createClient(supabaseUrl, supabasePublishableKey, {
+export const supabase = createClient<Database>(supabaseUrl, supabasePublishableKey, {
   auth: {
     storage: localStorage,
     persistence: 'session',
@@ -21,4 +21,3 @@ export const supabase = createClient(supabaseUrl, supabasePublishableKey, {
   },
 });
   
-;
